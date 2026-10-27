@@ -57,13 +57,13 @@ Do not delete the metadata needed to clean up remote objects before cleanup is c
 
 ## 5. Restart behavior (MVP-level)
 
-At startup, list `PENDING`, `UNKNOWN`, and `CLEANUP_REQUIRED` records. Do not automatically promote a record just because five IDs return a value; validate the envelope metadata and Akeyless-decrypt/authentication context before declaring the set complete. If the workflow cannot safely resume, attempt cleanup and preserve the record for manual reconciliation. A full background reconciliation worker is deferred.
+At startup, list `PENDING`, `UNKNOWN`, and `CLEANUP_REQUIRED` records. Do not automatically promote a record just because IDs for every active profile provider return a value; validate the envelope metadata and Akeyless-decrypt/authentication context before declaring the set complete. If the workflow cannot safely resume, attempt cleanup and preserve the record for manual reconciliation. A full background reconciliation worker is deferred.
 
 ## 6. Recovery failure
 
-- Try providers until three distinct, valid shares have been acquired or all candidate providers have been exhausted.
+- Try providers until the active profile threshold of distinct, valid shares has been acquired or all candidate providers have been exhausted.
 - A provider timeout, invalid envelope, wrong context, wrong key reference, corrupted ciphertext, or duplicate index is not a valid share.
-- Fail without reconstructing if fewer than three valid shares are available.
+- Fail without reconstructing if fewer than the active profile threshold of valid shares are available.
 - Clean plaintext buffers on every path as best-effort.
 
 ## 7. Public deletion

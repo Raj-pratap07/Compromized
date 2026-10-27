@@ -4,7 +4,7 @@
 
 - **FastAPI (`app/api`)**: request/response models, authentication dependency, authorization, HTTP errors. No crypto orchestration in route handlers.
 - **Storage Orchestrator (`app/services/orchestrator.py`)**: owns store/recover sequencing, state transitions, retry/rollback decisions, cleanup calls.
-- **SSS service**: thin wrapper around a vetted library; config is fixed to 5 shares / threshold 3.
+- **SSS service**: thin wrapper around a vetted library; default profile is 5 shares / threshold 3. The temporary, explicitly selected test profile is 3 shares / threshold 2.
 - **Akeyless service**: performs Encrypt/Decrypt operations, Base64 conversion and encryption-context construction. It never accepts a caller-provided arbitrary key name without checking the configured mapping.
 - **Adapters**: one provider-specific implementation each, all with the same contract.
 - **SQLCipher repository**: owns short transactions for record and share status. No network call from inside a DB transaction.
@@ -18,6 +18,8 @@
 | `mongodb` | MongoDB Atlas | configured reference for share 3 |
 | `firebase` | Firebase Firestore | configured reference for share 4 |
 | `supabase` | Supabase PostgreSQL | configured reference for share 5 |
+
+The default `full` profile uses all five mappings. The temporary `three_provider` profile uses the `upstash`, `neon`, and `firebase` mappings as shares 1, 2, and 3, respectively.
 
 Key names/references are configuration, not cryptographic key material. The registry validates the mapping. SQLite may persist the configured reference used for a record/version, but it must never contain the raw key or Akeyless credentials.
 
@@ -62,7 +64,7 @@ Use a synchronous implementation end-to-end initially: sync FastAPI route handle
 flowchart TB
     U([User / Client]) --> API[FastAPI: auth, validation, safe responses]
     API <--> O[Storage Orchestrator]
-    O <--> SSS[SSS: 5 shares / threshold 3]
+    O <--> SSS[SSS: profile-configured threshold]
     O <--> AK[Akeyless: AES-256-GCM Encrypt / Decrypt]
     O <--> DB[(SQLCipher + SQLite metadata)]
     O <--> REG[Provider registry and adapters]
@@ -80,7 +82,7 @@ flowchart TD
     A[Client submits secret over HTTPS] --> B[Authenticate, authorize, validate size]
     B --> C[Create random record ID/version]
     C --> D[Commit PENDING record and 5 share rows]
-    D --> E[SSS split: 5 shares, threshold 3]
+    D --> E[SSS split: profile-configured shares and threshold]
     E --> F[For each share: select fixed provider/key]
     F --> G[Akeyless Encrypt with stable context]
     G --> H{Encryption succeeded?}
@@ -88,9 +90,9 @@ flowchart TD
     H -- Yes --> I[Provider put using deterministic share ID]
     I --> J{Confirmed outcome?}
     J -- Yes --> K[Commit share status STORED]
-    K --> L{All five done?}
+    K --> L{All active-profile providers done?}
     L -- No --> F
-    L -- Yes --> M[Verify 5 STORED; commit AVAILABLE]
+    L -- Yes --> M[Verify all active-profile writes STORED; commit AVAILABLE]
     M --> N[Return record ID/status]
     J -- Timeout --> U[Commit UNKNOWN; reconcile deterministic ID]
     U --> X

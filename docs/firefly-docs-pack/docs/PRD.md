@@ -7,7 +7,9 @@
 
 ## 1. Product summary
 
-Firefly stores one sensitive string/secret by splitting it into five Shamir shares with a threshold of three. Each share is encrypted using an Akeyless AES-256-GCM key dedicated to its storage provider, then stored by one independent provider. Firefly can recover the original secret when any three valid shares can be retrieved and decrypted. Metadata is held in a SQLCipher-encrypted SQLite database.
+In the default `full` profile, Firefly stores one sensitive string/secret by splitting it into five Shamir shares with a threshold of three. Each share is encrypted using an Akeyless AES-256-GCM key dedicated to its storage provider, then stored by one independent provider. Firefly can recover the original secret when any three valid shares can be retrieved and decrypted. Metadata is held in a SQLCipher-encrypted SQLite database.
+
+For temporary synthetic integration tests only, the human-approved `three_provider` profile uses Upstash, Neon, and Firestore with three shares and threshold two. The default remains the full five-provider 5/3 design.
 
 ## 2. Problem
 
@@ -18,7 +20,7 @@ A single database or storage-provider compromise should not automatically expose
 - Store one secret as five cryptographic shares with a 3-of-5 threshold.
 - Encrypt each share through Akeyless before the share is persisted by a provider.
 - Store exactly one share per provider across five services.
-- Recover from any three valid shares belonging to the same record/version.
+- In the default profile, recover from any three valid shares belonging to the same record/version.
 - Track operation progress and handle provider failures without falsely reporting success.
 - Protect metadata at rest with SQLCipher.
 - Avoid plaintext secrets/shares in logs and intentional temporary files.
@@ -52,7 +54,7 @@ The API accepts one secret in an HTTPS request body. It validates authentication
 
 ### FR-2 Split
 
-Use a reviewed SSS library to create five shares with threshold three. Do not implement Shamir's algorithm manually. Record each share's index and version. Do not use secret content in IDs.
+Use a reviewed SSS library to create the configured profile's shares (default five shares with threshold three). Do not implement Shamir's algorithm manually. Record each share's index and version. Do not use secret content in IDs.
 
 ### FR-3 Encrypt
 
@@ -64,7 +66,7 @@ Write one opaque Akeyless ciphertext to each of: Upstash Redis, Neon PostgreSQL,
 
 ### FR-5 Track progress
 
-Create a durable `PENDING` record before external writes. Persist per-share status as progress is made using short database transactions. `AVAILABLE` is permitted only after all five writes are confirmed and that final status commits.
+Create a durable `PENDING` record before external writes. Persist per-share status as progress is made using short database transactions. `AVAILABLE` is permitted only after all active-profile provider writes are confirmed and that final status commits.
 
 ### FR-6 Recover
 
@@ -116,7 +118,7 @@ Expose a basic health endpoint that does not reveal secrets, credentials, raw pr
 2. Inspect provider records and show each has opaque ciphertext, not plaintext.
 3. Recover the secret with three providers and show exact equality against the input.
 4. Temporarily make two providers unavailable; recovery should still work if the other three are available.
-5. Try recovery with fewer than three valid shares; it must fail.
+5. In the default profile, try recovery with fewer than three valid shares; it must fail. In the temporary test profile, fewer than two valid shares must fail.
 6. Tamper with a ciphertext or encryption context in a controlled test; Akeyless must reject it.
 7. Simulate a failed/uncertain write and show the state/rollback result.
 8. Demonstrate that SQLCipher requires its key and that metadata does not contain the secret.

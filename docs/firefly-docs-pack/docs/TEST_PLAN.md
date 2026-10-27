@@ -3,9 +3,10 @@
 ## 1. Unit tests (no network)
 
 ### SSS
-- Fixed test secret splits into five unique shares.
+- In the default profile, a fixed test secret splits into five unique shares.
+- In the temporary profile, a fixed test secret splits into three unique shares.
 - Every one of the 10 combinations of three shares recovers identical original bytes.
-- The application wrapper rejects fewer than three shares before reconstruction.
+- The application wrapper rejects fewer than the active profile threshold before reconstruction.
 - Duplicate indices and cross-record/cross-version share mixing are rejected.
 - Invalid/malformed share input fails safely.
 
@@ -17,7 +18,7 @@
 - Exceptions/log fields contain no plaintext or credentials.
 
 ### Metadata repository
-- Create pending record and exactly five share-operation rows.
+- Create pending record and exactly the active profile's number of share-operation rows.
 - Per-share state transitions persist.
 - AVAILABLE cannot be committed when one share is not STORED.
 - Transactions rollback on exception.
@@ -31,7 +32,7 @@
 - Cleanup failure produces CLEANUP_REQUIRED.
 - No secret/share/key is present in log records.
 - Recovery collects only distinct valid shares from the same record/version.
-- Fewer than three valid shares fails without invoking rebuild.
+- Fewer than the active profile threshold of valid shares fails without invoking rebuild.
 - Recovery cleanup path runs on success and errors.
 
 ## 2. Provider adapter integration tests (use test credentials only)
@@ -54,7 +55,8 @@ Provider set:
 
 ## 3. End-to-end tests
 
-- Store secret -> all 5 encrypted shares stored -> status AVAILABLE -> recover exact secret.
+- In the default profile, store secret -> all 5 encrypted shares stored -> status AVAILABLE -> recover exact secret.
+- In the temporary profile, store synthetic secret -> all 3 encrypted shares stored -> status AVAILABLE -> recover with any 2.
 - Exercise all 10 share combinations.
 - Simulate any two providers unavailable; recover from the remaining three.
 - Simulate three unavailable; recovery fails without returning partial plaintext.

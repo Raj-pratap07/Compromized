@@ -6,7 +6,7 @@ Read `docs/PRD.md`, `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.
 
 - Project name: Firefly.
 - Backend: Python + FastAPI. Keep route handlers thin; orchestration belongs in the service layer.
-- Secret sharing: Shamir Secret Sharing, **5 shares / threshold 3**. Do not change this to 2-of-3 or 5-of-5.
+- Default secret sharing profile: Shamir Secret Sharing, **5 shares / threshold 3**. A human-approved temporary `three_provider` profile uses only Upstash, Neon, and Firestore with 3 shares / threshold 2; do not make it the default or use it for production secrets.
 - Split the original secret directly for this MVP. Do not introduce a DEK/envelope-encryption redesign unless a human explicitly changes the decision.
 - Protect each of the five shares via Akeyless AES-256-GCM using fixed provider-to-key-reference mapping:
   1. `upstash` → its Akeyless key reference
@@ -19,8 +19,8 @@ Read `docs/PRD.md`, `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.
 - The backend is trusted with plaintext in this threat model. Do not add client-side encryption, holder microservices, MPC, FHE, or TEEs.
 - No Rust dependency. Python-only implementation.
 - Keep all external calls out of an open SQLite transaction. Use short transactions for metadata state updates.
-- An operation is `AVAILABLE` only when all five provider writes are confirmed and the state transition has committed.
-- Recovery requires three **distinct, valid** shares from one record/version. Akeyless authenticates each ciphertext; the orchestrator enforces the SSS threshold.
+- An operation is `AVAILABLE` only when all active-profile provider writes are confirmed and the state transition has committed.
+- Recovery requires the configured number of **distinct, valid** shares from one record/version (3 in `full`, 2 in `three_provider`). Akeyless authenticates each ciphertext; the orchestrator enforces the SSS threshold.
 - A timeout means `UNKNOWN`, not definitely failed. Reconcile by deterministic share ID before retry/delete.
 - All writes/deletes must be idempotent where the provider supports it. Never claim rollback is complete without confirmation.
 - No plaintext secrets, shares, raw keys, tokens, request bodies, or connection strings in logs, exceptions, telemetry, test snapshots, or error responses.

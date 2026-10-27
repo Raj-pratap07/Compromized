@@ -10,7 +10,7 @@ Give the agent one milestone and a small definition of done. Ask it to inspect t
 
 Copy and adapt this prompt:
 
-> Read `AGENTS.md`, `docs/DECISIONS.md`, the relevant architecture/API/data-model docs, and inspect the existing repository and git status. Implement only **[one named milestone]**. Do not change the 5-share/threshold-3 SSS design, the five providers, Akeyless AES-256-GCM, SQLCipher metadata, or the trusted-backend threat model. Do not add unrelated features. Use maintained libraries; do not write custom cryptographic algorithms. Add/update tests in the same change. Run the relevant test commands and report exact results. Show the files changed, assumptions, remaining risks, and any tests not run. Do not claim success without evidence.
+> Read `AGENTS.md`, `docs/DECISIONS.md`, the relevant architecture/API/data-model docs, and inspect the existing repository and git status. Implement only **[one named milestone]**. Keep the default `full` profile at 5 shares / threshold 3 and all five providers. The approved temporary `three_provider` profile is 3 shares / threshold 2 on Upstash, Neon, and Firestore only; do not make it the default or use it for production secrets. Preserve Akeyless AES-256-GCM, SQLCipher metadata, and the trusted-backend threat model. Do not add unrelated features. Use maintained libraries; do not write custom cryptographic algorithms. Add/update tests in the same change. Run the relevant test commands and report exact results. Show the files changed, assumptions, remaining risks, and any tests not run. Do not claim success without evidence.
 
 ## 3. Recommended prompt sequence
 
@@ -22,7 +22,7 @@ Copy and adapt this prompt:
 6. **One adapter:** choose one provider and prove put/get/delete/idempotency.
 7. **Remaining adapters one by one:** reuse the same interface; no divergent API.
 8. **Orchestrator store path:** use fake adapters/fault injection first.
-9. **Orchestrator recovery path:** test all ten combinations of three valid shares.
+9. **Orchestrator recovery path:** test all ten 3-share combinations in `full`, and all 2-share combinations in `three_provider`.
 10. **FastAPI endpoints:** wire schema/auth/errors to the tested services.
 11. **Full system test:** run acceptance/failure tests and inspect logs/diff.
 
@@ -34,7 +34,7 @@ Before accepting a diff, ask:
 - Are all network calls outside DB transactions?
 - Does every write outcome update metadata?
 - Is timeout/UNKNOWN handled without blind deletion/retry?
-- Does recovery enforce three distinct valid shares from the same record/version?
+- Does recovery enforce the active profile's threshold of distinct valid shares from the same record/version?
 - Does it use Akeyless's actual API format and exact encryption context?
 - Is SQLCipher genuinely used, not standard sqlite3?
 - Are tests meaningful and were they run?

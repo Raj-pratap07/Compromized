@@ -27,7 +27,7 @@ Use the tasks in order. Do not ask one agent to build the entire system.
 **Prompt:** Implement storage state machine from `FAILURE_HANDLING.md` with fake adapters and injected failures first. Ensure status commits are short transactions and `AVAILABLE` requires five confirmed writes.
 
 ## T8 — Recovery orchestration
-**Prompt:** Implement recovery with mocked providers/Akeyless first. Validate distinct indexes/version/context; collect three valid shares; fail with fewer than three; clean mutable buffers on all paths.
+**Prompt:** Implement recovery with mocked providers/Akeyless first. Validate distinct indexes/version/context; collect the active profile threshold (three in `full`, two in `three_provider`); fail below threshold; clean mutable buffers on all paths.
 
 ## T9 — API wiring
 **Prompt:** Implement routes/schemas/auth according to `API_CONTRACT.md`. Routes stay thin. Test status codes and ensure sensitive response/log handling.

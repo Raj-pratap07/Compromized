@@ -5,6 +5,7 @@
 - Commit `.env.example` with placeholder names only; `.env` is gitignored.
 - Keep the Akeyless Access Key/token, all five provider credentials, and SQLCipher key in protected backend configuration. Never expose them in frontend assets or endpoints.
 - For the hackathon, environment variables are acceptable for runtime secrets, but do not describe them as production-grade secret management. Akeyless API-key authentication is documented for quick POCs; Akeyless recommends workload identity/cloud IAM patterns for production deployments.
+- The temporary `three_provider` profile is strictly for synthetic tests. It uses a 2-of-3 threshold and one fewer independent provider, so do not use it to store real or production secrets. `full` remains the default.
 - Use distinct provider credentials/projects where practical and least privilege for each provider. No provider needs access to another provider.
 - The orchestrator must validate all configured key references against a fixed provider registry.
 

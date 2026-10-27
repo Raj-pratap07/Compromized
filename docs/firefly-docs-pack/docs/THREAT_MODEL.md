@@ -46,7 +46,7 @@ Reduce the chance that theft or compromise of one storage provider—or offline 
 |---|---|---|
 | One provider database dumped | Store Akeyless ciphertext only | Compromised Akeyless permission or backend can decrypt |
 | Ciphertext modified | Akeyless AES-GCM authentication/context | Metadata/provider routing must also be validated |
-| One/two providers unavailable after create | 3-of-5 SSS, fetch candidates until 3 valid | Create requires all five writes; Akeyless must also be available |
+| Provider outage after create | `full`: 3-of-5 SSS; temporary `three_provider`: 2-of-3 | Create requires every active profile write; reduced profile is for synthetic tests only |
 | Provider write timeout | `UNKNOWN`, deterministic ID, reconciliation | Provider API may not make outcome instantly observable |
 | Partial create | Per-share durable statuses, rollback, `CLEANUP_REQUIRED` | Cross-provider deletion is not atomic; cleanup can remain incomplete |
 | Offline metadata-file theft | SQLCipher | Not protection from running-process compromise or key loss |
@@ -61,6 +61,6 @@ Reduce the chance that theft or compromise of one storage provider—or offline 
 - The configured provider-to-key map is trusted configuration; untrusted metadata cannot select an arbitrary key.
 - Encryption context binds record ID, version, share index, provider ID and format version.
 - A recovery share is counted only after successful Akeyless decryption/authentication and validation.
-- No secret is returned unless at least three distinct valid shares reconstruct successfully and the caller is authorized.
+- No secret is returned unless the active profile threshold of distinct valid shares reconstructs successfully and the caller is authorized.
 - Never log plaintext or credentials.
 - Do not claim protection against a compromised API server.

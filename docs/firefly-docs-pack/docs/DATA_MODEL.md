@@ -11,8 +11,8 @@ Use two tables so the record lifecycle and per-share progress can be updated ind
 | `record_id` | TEXT PRIMARY KEY | Random opaque ID; never derived from secret |
 | `owner_id` | TEXT NOT NULL | Authorization ownership |
 | `version` | INTEGER NOT NULL, default 1 | Share-set version |
-| `share_count` | INTEGER NOT NULL, check = 5 | Fixed configuration |
-| `threshold` | INTEGER NOT NULL, check = 3 | Fixed configuration |
+| `share_count` | INTEGER NOT NULL, check matches active profile (5 or 3) | Fixed per profile |
+| `threshold` | INTEGER NOT NULL, check matches active profile (3 or 2) | Fixed per profile |
 | `status` | TEXT NOT NULL | `PENDING`, `AVAILABLE`, `FAILED`, `CLEANUP_REQUIRED`, `RECONCILIATION_REQUIRED`, optionally `DELETING`, `DELETE_INCOMPLETE` |
 | `created_at` | UTC timestamp text | Created time |
 | `updated_at` | UTC timestamp text | Last state update |
@@ -25,7 +25,7 @@ Use two tables so the record lifecycle and per-share progress can be updated ind
 |---|---|---|
 | `record_id` | TEXT FK → secret_records | Parent record |
 | `version` | INTEGER NOT NULL | Share set version |
-| `share_index` | INTEGER NOT NULL, check 1–5 | Unique share index |
+| `share_index` | INTEGER NOT NULL, check 1–share_count | Unique share index |
 | `provider_id` | TEXT NOT NULL, allow-listed | Fixed provider identity |
 | `share_id` | TEXT NOT NULL UNIQUE | Deterministic provider object ID |
 | `key_ref` | TEXT NOT NULL | Akeyless key reference, not key material |
@@ -35,7 +35,7 @@ Use two tables so the record lifecycle and per-share progress can be updated ind
 | `last_error_code` | TEXT nullable | Normalized safe error code |
 | `PRIMARY KEY` | `(record_id, version, share_index)` | No duplicate index per version |
 
-Add constraints/indexes for owner/status lookup and enforce exactly five rows per record in application logic or a carefully designed transaction (SQLite cannot easily enforce “exactly five related rows” as a simple row check).
+Add constraints/indexes for owner/status lookup and enforce exactly `share_count` rows per record in application logic or a carefully designed transaction (SQLite cannot easily enforce an exact related-row count as a simple row check).
 
 ## 2. What is prohibited from metadata
 
@@ -70,7 +70,8 @@ Use a deterministic storage key/object ID based on record ID, version and share 
 - Use a SQLCipher-linked driver, not Python's standard unencrypted `sqlite3` module.
 - The database key is stable across restarts and stored outside the database.
 - Do not start a network request inside a DB transaction.
-- Commit `PENDING` before external work; commit per-share progress as operations finish; commit `AVAILABLE` only after all five writes are confirmed.
+- Commit `PENDING` before external work; commit per-share progress as operations finish; commit `AVAILABLE` only after all active-profile writes are confirmed.
+- The temporary `three_provider` profile uses a separate SQLCipher file from `full`; records are not migrated or shared between profiles.
 - Do not silently recreate an existing DB that fails to open.
 - For a small MVP DB, run supported `PRAGMA cipher_integrity_check` at startup/maintenance and fail closed if it reports problems.
 - Do not implement custom metadata MAC in MVP. Do not claim the SQLCipher page HMAC detects logical changes made through a valid DB connection.

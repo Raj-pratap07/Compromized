@@ -8,7 +8,7 @@ For the initial single-user hackathon demo, use a configured bearer token (`FIRE
 
 ## `POST /secrets`
 
-**Purpose:** create a new secret record and distribute five shares.
+**Purpose:** create a new secret record and distribute shares to every active profile provider. The default profile distributes five.
 
 Request JSON:
 
@@ -20,8 +20,8 @@ Success `201`:
 
 - `record_id`: random opaque ID
 - `status`: `AVAILABLE`
-- `share_count`: `5`
-- `threshold`: `3`
+- `share_count`: `5` in `full`, `3` in `three_provider`
+- `threshold`: `3` in `full`, `2` in `three_provider`
 - `created_at`: UTC timestamp
 
 A secret must never be echoed in the response.
@@ -30,7 +30,7 @@ Possible errors: `400` invalid payload; `401` missing/invalid authentication; `4
 
 ## `POST /secrets/{record_id}/recover`
 
-**Purpose:** recover the secret from any three valid shares.
+**Purpose:** recover the secret from the configured profile's threshold of valid shares (three by default).
 
 Request body: empty or a minimal request ID if required for audit; secret is not sent again.
 
@@ -40,7 +40,7 @@ Success `200`:
 
 Headers: `Cache-Control: no-store`, `Pragma: no-cache`.
 
-The response is sensitive and must not be logged or cached. Validate owner and `AVAILABLE` status before contacting providers. The orchestrator must collect three distinct, valid shares from the correct record/version. If fewer than three are obtained, return a generic recoverability error such as `503` or `409` without revealing which providers held valid shares.
+The response is sensitive and must not be logged or cached. Validate owner and `AVAILABLE` status before contacting providers. The orchestrator must collect the configured number of distinct, valid shares from the correct record/version. If fewer than the threshold are obtained, return a generic recoverability error such as `503` or `409` without revealing which providers held valid shares.
 
 ## `GET /secrets/{record_id}/status`
 

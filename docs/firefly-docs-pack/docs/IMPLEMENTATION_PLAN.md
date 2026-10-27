@@ -8,7 +8,7 @@ Tasks:
 - Inspect existing repo, branch, uncommitted work and current files.
 - Create/activate venv and establish supported Python version.
 - Confirm SQLCipher driver installs and reports SQLCipher.
-- Confirm Akeyless account has five usable AES-256-GCM keys and enough API operations.
+- Confirm Akeyless account has five usable AES-256-GCM keys and enough API operations for the default profile.
 - Verify credentials are not tracked.
 
 Done when: environment checks are documented and a minimal test can open an encrypted SQLCipher DB.
@@ -16,7 +16,7 @@ Done when: environment checks are documented and a minimal test can open an encr
 ## Milestone 1 — Contracts and configuration
 
 Tasks:
-- Add typed settings for app auth token, SQLCipher key, five provider connections, Akeyless auth and key references.
+- Add typed settings for app auth token, SQLCipher key, five provider connections, Akeyless auth and key references, and the explicit temporary test profile.
 - Fail at startup if required config is missing or malformed (except optional test mode).
 - Define `ProviderId`, `ShareEnvelope`, `PutOutcome`, `DeleteOutcome`, record/share statuses.
 - Define API request/response schemas.
@@ -38,7 +38,7 @@ Done when: correct key opens DB; wrong key fails; no plaintext secret fields exi
 Tasks:
 - Evaluate candidate maintained SSS libraries; do not invent arithmetic.
 - Choose based on review, API, supported payload size, secure randomness, license and tests.
-- Implement thin wrapper with fixed 5/3 settings and clear validation.
+- Implement thin wrapper with 5/3 defaults and clear validation; support the approved temporary 3/2 test configuration.
 
 Done when: 5 shares created; all 10 three-share combinations recover exact bytes; fewer-than-three requests are rejected by wrapper; duplicate/malformed share test cases rejected where supported.
 
@@ -47,7 +47,7 @@ Done when: 5 shares created; all 10 three-share combinations recover exact bytes
 Tasks:
 - Configure one test key and exercise Encrypt/Decrypt end to end.
 - Verify Base64 representation for bytes and context match behavior.
-- Then map five distinct keys to five providers.
+- Then map five distinct keys to five providers for the default profile.
 - Normalize errors/timeouts; never log secret or token.
 
 Done when: binary test vectors round-trip exactly; wrong context/ciphertext fails; configured key mapping is enforced. If Akeyless plan doesn't support five keys, stop and bring the issue to the human rather than silently switching design.
@@ -66,7 +66,7 @@ Done when: adapter-specific integration tests pass with isolated credentials and
 
 ## Milestone 7 — Store orchestrator
 
-Implement pending record → split → per-share Akeyless Encrypt → adapter put → persist status → confirm five stored → AVAILABLE. On failure, reconcile unknown write, rollback stored objects and persist FAILED/CLEANUP_REQUIRED.
+Implement pending record → split → per-share Akeyless Encrypt → adapter put → persist status → confirm every active-profile provider write → AVAILABLE. On failure, reconcile unknown write, rollback stored objects and persist FAILED/CLEANUP_REQUIRED.
 
 Done when: fault-injection tests cover failure at each provider index, Akeyless failure and timeout.
 
@@ -74,7 +74,7 @@ Done when: fault-injection tests cover failure at each provider index, Akeyless 
 
 Implement owner authorization, record lookup, provider selection, share validation, Akeyless Decrypt, threshold collection, SSS rebuild and safe response.
 
-Done when: recover with all 10 share combinations; survive any two provider outages after successful storage; fail safely with fewer than three valid shares; no secret is logged/cached.
+Done when: `full` recovers with all 10 share combinations and tolerates any two provider outages; `three_provider` recovers with each pair and tolerates one provider outage; both fail safely below threshold and never log/cache secrets.
 
 ## Milestone 9 — FastAPI integration
 

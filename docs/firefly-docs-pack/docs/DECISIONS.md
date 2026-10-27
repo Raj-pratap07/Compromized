@@ -12,9 +12,9 @@ This file is the source of truth for locked decisions. Ask a human before changi
 ## ADR-002 — SSS configuration
 
 **Status:** Accepted  
-**Decision:** Split one original secret directly into 5 shares with threshold 3.  
+**Decision:** In the default `full` profile, split one original secret directly into 5 shares with threshold 3.
 **Reason:** Simple MVP for one secret credential; no separate DEK/payload envelope.  
-**Consequences:** Any 3 valid shares recover; fewer than 3 reveal no information under a correct SSS implementation. A successful creation requires all five writes confirmed, while later recovery tolerates up to two unavailable providers.
+**Consequences:** In `full`, any 3 valid shares recover; fewer than 3 reveal no information under a correct SSS implementation. A successful creation requires all five writes confirmed, while later recovery tolerates up to two unavailable providers.
 
 ## ADR-003 — Share encryption
 
@@ -76,3 +76,10 @@ This file is the source of truth for locked decisions. Ask a human before changi
 **Status:** Pending compatibility spike  
 **Decision:** Select a SQLCipher-linked Python driver only after verifying installability on the team's OS. Standard `sqlite3` is not sufficient.  
 **Required proof:** `PRAGMA cipher_version` reports SQLCipher; wrong key fails to open existing DB; correct key opens it; tampered copy fails an integrity check where supported. Document driver package/version and key application syntax.
+
+## ADR-012 — Temporary three-provider integration profile
+
+**Status:** Accepted for temporary integration testing
+**Decision:** Preserve `full` as the default profile (five providers, 5 shares / threshold 3). Add an explicitly selected `three_provider` profile using Upstash, Neon, and Firestore with 3 shares / threshold 2 while MongoDB Atlas and Supabase are unavailable.
+**Reason:** Allow a synthetic end-to-end integration test without silently changing the intended full deployment design.
+**Consequences:** `FIREFLY_PROFILE=three_provider` is temporary and must not be used for production secrets. The profile only requires configuration for its active providers. Its metadata uses a separate SQLCipher database file, so existing full-profile records are not migrated or accessible while in the temporary profile. Switching back to `FIREFLY_PROFILE=full` restores the original metadata path. `AVAILABLE` still requires every active profile provider write to be confirmed. Restore the five-provider profile after MongoDB and Supabase are ready.
