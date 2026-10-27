@@ -1,0 +1,12 @@
+flowchart TB
+    U([User / Client]) --> API[FastAPI: auth, validation, safe responses]
+    API <--> O[Storage Orchestrator]
+    O <--> SSS[SSS: 5 shares / threshold 3]
+    O <--> AK[Akeyless: AES-256-GCM Encrypt / Decrypt]
+    O <--> DB[(SQLCipher + SQLite metadata)]
+    O <--> REG[Provider registry and adapters]
+    REG <--> P1[(Upstash Redis)]
+    REG <--> P2[(Neon PostgreSQL)]
+    REG <--> P3[(MongoDB Atlas)]
+    REG <--> P4[(Firebase Firestore)]
+    REG <--> P5[(Supabase PostgreSQL)]
