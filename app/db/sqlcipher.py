@@ -6,32 +6,52 @@ import sqlcipher3
 
 from app.core.errors import ConfigurationError
 
+REQUIRED_TABLES = ("secret_records", "share_operations")
+
 
 def _escape_sqlcipher_key(value: str) -> str:
     return value.replace("'", "''")
 
 
-def open_sqlcipher_database(database_path: str, key: str):
-    os.makedirs(os.path.dirname(database_path) or ".", exist_ok=True)
+def open_sqlcipher_database(database_path: str, key: str, *, create: bool = False):
+    """Open a SQLCipher database, failing closed.
+
+    Normal startup (create=False) never creates a file: a missing database is an
+    error. Only explicit first-time initialization passes create=True.
+    """
+    if create:
+        os.makedirs(os.path.dirname(database_path) or ".", exist_ok=True)
+    elif not os.path.isfile(database_path):
+        raise ConfigurationError(
+            "SQLCipher database not found; run explicit first-time initialization"
+        )
     connection = sqlcipher3.connect(database_path)
-    connection.execute(f"PRAGMA key = '{_escape_sqlcipher_key(key)}';")
     try:
-        connection.execute("SELECT count(*) FROM sqlite_master;")
-        connection.execute("PRAGMA cipher_version;")
-    except Exception as exc:  # pragma: no cover - defensive guard for invalid key
+        connection.execute(f"PRAGMA key = '{_escape_sqlcipher_key(key)}';")
+        version = connection.execute("PRAGMA cipher_version;").fetchone()
+        if not version or not version[0]:
+            raise ConfigurationError("The SQLite driver is not linked to SQLCipher")
+        # The first read fails for a wrong key or a damaged header page.
+        connection.execute("SELECT count(*) FROM sqlite_master;").fetchone()
+    except ConfigurationError:
         connection.close()
-        raise ConfigurationError(f"SQLCipher database is not usable: {exc}") from exc
+        raise
+    except Exception:
+        connection.close()
+        raise ConfigurationError(
+            "SQLCipher database could not be opened with the configured key"
+        ) from None
     return connection
 
 
 def initialize_sqlcipher_schema(
     connection,
     *,
-    share_count: int = 5,
-    threshold: int = 3,
+    share_count: int = 3,
+    threshold: int = 2,
 ) -> None:
-    if share_count < threshold or threshold < 1:
-        raise ValueError("Invalid Shamir share configuration")
+    if (share_count, threshold) != (3, 2):
+        raise ValueError("Firefly metadata requires exactly 3 shares with threshold 2")
     connection.execute(
         f"""
         CREATE TABLE IF NOT EXISTS secret_records (
@@ -76,14 +96,17 @@ def initialize_sqlcipher_schema(
     connection.commit()
 
 
+def verify_sqlcipher_schema(connection) -> bool:
+    """Return True only if the expected tables exist in the opened database."""
+    rows = connection.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table';"
+    ).fetchall()
+    return set(REQUIRED_TABLES).issubset({row[0] for row in rows})
+
+
 def check_sqlcipher_integrity(connection) -> bool:
+    """cipher_integrity_check returns no rows when every page authenticates."""
     try:
-        result = connection.execute("PRAGMA cipher_integrity_check;").fetchone()
+        return connection.execute("PRAGMA cipher_integrity_check;").fetchall() == []
     except Exception:
         return False
-    if result is None:
-        return True
-    value = result[0]
-    if value is None:
-        return True
-    return isinstance(value, str) and ("ok" in value.lower() or "pass" in value.lower() or value.lower() == "")

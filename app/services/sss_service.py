@@ -7,8 +7,9 @@ from typing import Iterable, List
 
 import shamirs
 
-SHARE_COUNT = 5
-THRESHOLD = 3
+SHARE_COUNT = 3
+THRESHOLD = 2
+CHUNK_SIZE = 15
 
 
 @dataclass
@@ -30,47 +31,41 @@ class ShareBundle:
     def from_bytes(cls, raw: bytes) -> "ShareBundle":
         payload = json.loads(raw.decode("utf-8"))
         index = int(payload["index"])
-        if not 1 <= index <= SHARE_COUNT or not isinstance(payload["fragments"], list):
+        if (
+            not 1 <= index <= SHARE_COUNT
+            or not isinstance(payload["fragments"], list)
+            or not payload["fragments"]
+        ):
             raise ValueError("Malformed share bundle")
-        return cls(
-            index=index,
-            fragments=[
-                {
-                    "length": int(fragment["length"]),
-                    "share": base64.b64decode(fragment["share"], validate=True),
-                }
-                for fragment in payload["fragments"]
-            ],
-        )
+        fragments = [
+            {
+                "length": int(fragment["length"]),
+                "share": base64.b64decode(fragment["share"], validate=True),
+            }
+            for fragment in payload["fragments"]
+        ]
+        if any(not 1 <= fragment["length"] <= CHUNK_SIZE for fragment in fragments):
+            raise ValueError("Malformed share bundle")
+        return cls(index=index, fragments=fragments)
 
 
 class SSSService:
     def __init__(self, *, share_count: int = SHARE_COUNT, threshold: int = THRESHOLD):
-        if threshold < 1 or share_count < threshold:
-            raise ValueError(
-                "threshold must be positive and share_count must be at least threshold"
-            )
+        if (share_count, threshold) != (SHARE_COUNT, THRESHOLD):
+            raise ValueError("Firefly requires exactly 3 shares with a threshold of 2")
         self.share_count = share_count
         self.threshold = threshold
 
     @staticmethod
-    def _chunk_payload(payload: bytes, chunk_size: int = 15) -> List[bytes]:
+    def _chunk_payload(payload: bytes, chunk_size: int = CHUNK_SIZE) -> List[bytes]:
         return [payload[i : i + chunk_size] for i in range(0, len(payload), chunk_size)]
 
     @staticmethod
-    def decode_share(raw: bytes):
-        if raw.startswith(b"{"):
-            try:
-                return ShareBundle.from_bytes(raw)
-            except Exception:
-                pass
+    def decode_share(raw: bytes) -> ShareBundle:
         try:
-            return shamirs.share.from_bytes(raw)
-        except Exception as exc:
-            try:
-                return ShareBundle.from_bytes(raw)
-            except Exception:
-                raise ValueError("Unrecognized share payload") from exc
+            return ShareBundle.from_bytes(raw)
+        except Exception:
+            raise ValueError("Unrecognized share payload") from None
 
     def split_secret(self, secret: str | bytes) -> List[object]:
         payload = secret.encode("utf-8") if isinstance(secret, str) else secret

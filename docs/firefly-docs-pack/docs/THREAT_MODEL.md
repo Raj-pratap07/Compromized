@@ -28,7 +28,7 @@ Reduce the chance that theft or compromise of one storage provider—or offline 
 
 - Original secret (highest sensitivity).
 - Plaintext SSS shares and reconstructed secret in backend memory.
-- Akeyless authentication credentials and five encryption key references/permissions.
+- Akeyless authentication credentials and the three encryption key references/permissions.
 - SQLCipher database key.
 - Provider credentials/connection strings.
 - Metadata: owner, record ID, provider mapping, version, statuses.
@@ -37,7 +37,7 @@ Reduce the chance that theft or compromise of one storage provider—or offline 
 
 1. Client ↔ FastAPI: HTTPS required; backend sees plaintext after request parsing in the agreed design.
 2. FastAPI/orchestrator ↔ Akeyless: HTTPS and authenticated API calls; Akeyless receives plaintext share during encrypt/decrypt operations.
-3. Orchestrator ↔ five storage providers: send/store only ciphertext; use distinct credentials and TLS.
+3. Orchestrator ↔ three storage providers: send/store only ciphertext; use distinct credentials and TLS.
 4. Backend ↔ local metadata file: SQLCipher protects at-rest file contents; backend has access to its key at runtime.
 
 ## 6. Threat/control table
@@ -46,7 +46,7 @@ Reduce the chance that theft or compromise of one storage provider—or offline 
 |---|---|---|
 | One provider database dumped | Store Akeyless ciphertext only | Compromised Akeyless permission or backend can decrypt |
 | Ciphertext modified | Akeyless AES-GCM authentication/context | Metadata/provider routing must also be validated |
-| Provider outage after create | `full`: 3-of-5 SSS; temporary `three_provider`: 2-of-3 | Create requires every active profile write; reduced profile is for synthetic tests only |
+| Provider outage after create | 2-of-3 SSS across Upstash, Neon, and Firestore | Create requires all three writes; demo uses synthetic secrets only |
 | Provider write timeout | `UNKNOWN`, deterministic ID, reconciliation | Provider API may not make outcome instantly observable |
 | Partial create | Per-share durable statuses, rollback, `CLEANUP_REQUIRED` | Cross-provider deletion is not atomic; cleanup can remain incomplete |
 | Offline metadata-file theft | SQLCipher | Not protection from running-process compromise or key loss |

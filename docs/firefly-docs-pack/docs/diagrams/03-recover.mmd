@@ -10,7 +10,7 @@ flowchart TD
     I --> J{Valid authenticated share?}
     J -- No --> K[Reject candidate; try another]
     J -- Yes --> L[Collect distinct plaintext share]
-    L --> M{3 valid shares?}
+    L --> M{2 valid shares?}
     M -- Yes --> N[SSS rebuild original secret]
     M -- No --> O{Unused providers remain?}
     K --> O

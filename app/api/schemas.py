@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
@@ -20,9 +19,9 @@ class SecretCreateRequest(BaseModel):
 class SecretCreateResponse(BaseModel):
     record_id: str
     status: str
-    share_count: int = 5
-    threshold: int = 3
-    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    share_count: int = 3
+    threshold: int = 2
+    created_at: str
 
 
 class SecretRecoverResponse(BaseModel):
@@ -32,7 +31,6 @@ class SecretRecoverResponse(BaseModel):
 
 class SecretStatusResponse(BaseModel):
     record_id: str
-    owner_id: str
     version: int
     status: str
     threshold: int

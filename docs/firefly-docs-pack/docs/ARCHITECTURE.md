@@ -4,7 +4,7 @@
 
 - **FastAPI (`app/api`)**: request/response models, authentication dependency, authorization, HTTP errors. No crypto orchestration in route handlers.
 - **Storage Orchestrator (`app/services/orchestrator.py`)**: owns store/recover sequencing, state transitions, retry/rollback decisions, cleanup calls.
-- **SSS service**: thin wrapper around a vetted library; default profile is 5 shares / threshold 3. The temporary, explicitly selected test profile is 3 shares / threshold 2.
+- **SSS service**: thin wrapper around a vetted library; the only supported configuration is 3 shares / threshold 2.
 - **Akeyless service**: performs Encrypt/Decrypt operations, Base64 conversion and encryption-context construction. It never accepts a caller-provided arbitrary key name without checking the configured mapping.
 - **Adapters**: one provider-specific implementation each, all with the same contract.
 - **SQLCipher repository**: owns short transactions for record and share status. No network call from inside a DB transaction.
@@ -15,11 +15,9 @@
 |---|---|---|
 | `upstash` | Upstash Redis | configured reference for share 1 |
 | `neon` | Neon PostgreSQL | configured reference for share 2 |
-| `mongodb` | MongoDB Atlas | configured reference for share 3 |
-| `firebase` | Firebase Firestore | configured reference for share 4 |
-| `supabase` | Supabase PostgreSQL | configured reference for share 5 |
+| `firebase` | Firebase Firestore | configured reference for share 3 |
 
-The default `full` profile uses all five mappings. The temporary `three_provider` profile uses the `upstash`, `neon`, and `firebase` mappings as shares 1, 2, and 3, respectively.
+The only supported `three_provider` profile uses the `upstash`, `neon`, and `firebase` mappings as shares 1, 2, and 3, respectively.
 
 Key names/references are configuration, not cryptographic key material. The registry validates the mapping. SQLite may persist the configured reference used for a record/version, but it must never contain the raw key or Akeyless credentials.
 
@@ -44,7 +42,7 @@ The exact interface should encode outcomes explicitly: confirmed success, confir
 
 - `record_id`
 - `version`
-- `share_index` (1–5)
+- `share_index` (1–3)
 - `provider_id`
 - `key_ref` (reference only)
 - `format_version`
@@ -70,9 +68,7 @@ flowchart TB
     O <--> REG[Provider registry and adapters]
     REG <--> P1[(Upstash Redis)]
     REG <--> P2[(Neon PostgreSQL)]
-    REG <--> P3[(MongoDB Atlas)]
-    REG <--> P4[(Firebase Firestore)]
-    REG <--> P5[(Supabase PostgreSQL)]
+    REG <--> P3[(Firebase Firestore)]
 ```
 
 ### Diagram B — store/distribute
@@ -81,7 +77,7 @@ flowchart TB
 flowchart TD
     A[Client submits secret over HTTPS] --> B[Authenticate, authorize, validate size]
     B --> C[Create random record ID/version]
-    C --> D[Commit PENDING record and 5 share rows]
+    C --> D[Commit PENDING record and 3 share rows]
     D --> E[SSS split: profile-configured shares and threshold]
     E --> F[For each share: select fixed provider/key]
     F --> G[Akeyless Encrypt with stable context]
@@ -121,7 +117,7 @@ flowchart TD
     I --> J{Valid authenticated share?}
     J -- No --> K[Reject candidate; try another]
     J -- Yes --> L[Collect distinct plaintext share]
-    L --> M{3 valid shares?}
+    L --> M{2 valid shares?}
     M -- Yes --> N[SSS rebuild original secret]
     M -- No --> O{Unused providers remain?}
     K --> O

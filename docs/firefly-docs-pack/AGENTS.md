@@ -6,21 +6,19 @@ Read `docs/PRD.md`, `docs/DECISIONS.md`, `docs/ARCHITECTURE.md`, `docs/SECURITY.
 
 - Project name: Firefly.
 - Backend: Python + FastAPI. Keep route handlers thin; orchestration belongs in the service layer.
-- Default secret sharing profile: Shamir Secret Sharing, **5 shares / threshold 3**. A human-approved temporary `three_provider` profile uses only Upstash, Neon, and Firestore with 3 shares / threshold 2; do not make it the default or use it for production secrets.
+- The only supported secret sharing configuration is Shamir Secret Sharing, **3 shares / threshold 2**, mapped to Upstash, Neon, and Firestore. Do not reintroduce a five-provider profile without explicit human approval.
 - Split the original secret directly for this MVP. Do not introduce a DEK/envelope-encryption redesign unless a human explicitly changes the decision.
-- Protect each of the five shares via Akeyless AES-256-GCM using fixed provider-to-key-reference mapping:
+- Protect each of the three shares via Akeyless AES-256-GCM using fixed provider-to-key-reference mapping:
   1. `upstash` → its Akeyless key reference
   2. `neon` → its Akeyless key reference
-  3. `mongodb` → its Akeyless key reference
-  4. `firebase` → its Akeyless key reference
-  5. `supabase` → its Akeyless key reference
-- Store one ciphertext per provider: Upstash Redis, Neon PostgreSQL, MongoDB Atlas, Firebase Firestore, Supabase PostgreSQL.
+  3. `firebase` → its Akeyless key reference
+- Store one ciphertext per provider: Upstash Redis, Neon PostgreSQL, Firebase Firestore.
 - Metadata: SQLCipher-encrypted SQLite. Never store the original secret, plaintext shares, or raw Akeyless AES keys in metadata.
 - The backend is trusted with plaintext in this threat model. Do not add client-side encryption, holder microservices, MPC, FHE, or TEEs.
 - No Rust dependency. Python-only implementation.
 - Keep all external calls out of an open SQLite transaction. Use short transactions for metadata state updates.
 - An operation is `AVAILABLE` only when all active-profile provider writes are confirmed and the state transition has committed.
-- Recovery requires the configured number of **distinct, valid** shares from one record/version (3 in `full`, 2 in `three_provider`). Akeyless authenticates each ciphertext; the orchestrator enforces the SSS threshold.
+- Recovery requires two **distinct, valid** shares from one record/version. Akeyless authenticates each ciphertext; the orchestrator enforces the SSS threshold.
 - A timeout means `UNKNOWN`, not definitely failed. Reconcile by deterministic share ID before retry/delete.
 - All writes/deletes must be idempotent where the provider supports it. Never claim rollback is complete without confirmation.
 - No plaintext secrets, shares, raw keys, tokens, request bodies, or connection strings in logs, exceptions, telemetry, test snapshots, or error responses.

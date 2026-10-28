@@ -3,15 +3,12 @@ from __future__ import annotations
 from typing import Dict, Iterable
 
 from psycopg.conninfo import make_conninfo
-from pymongo.uri_parser import parse_uri
 
 from app.core.config import Settings, get_settings
 from app.core.errors import ConfigurationError
 from app.storage.base import BaseStorageAdapter
 from app.storage.firebase import FirebaseAdapter
-from app.storage.mongodb import MongoDBAdapter
 from app.storage.neon import NeonAdapter
-from app.storage.supabase import SupabaseAdapter
 from app.storage.upstash import UpstashAdapter
 
 
@@ -32,6 +29,10 @@ class ProviderRegistry:
     def provider_ids(self) -> list[str]:
         return list(self._adapters.keys())
 
+    def close(self) -> None:
+        for adapter in self._adapters.values():
+            adapter.close()
+
     def __contains__(self, provider_id: str) -> bool:
         return provider_id in self._adapters
 
@@ -42,13 +43,7 @@ def create_provider_registry(settings: Settings | None = None) -> ProviderRegist
     provider_configuration = {
         "upstash": (config.upstash_rest_url, config.upstash_rest_token),
         "neon": (config.neon_database_url,),
-        "mongodb": (config.mongodb_uri, config.mongodb_database, config.mongodb_collection),
         "firebase": (config.firebase_project_id, config.firestore_collection),
-        "supabase": (
-            config.supabase_database_url,
-            config.supabase_schema,
-            config.supabase_table,
-        ),
     }
     configured_values = [
         config.akeyless_access_id,
@@ -63,12 +58,7 @@ def create_provider_registry(settings: Settings | None = None) -> ProviderRegist
     ):
         raise ConfigurationError("Required provider configuration is missing or invalid")
     try:
-        if "neon" in config.provider_ids:
-            make_conninfo(config.neon_database_url)
-        if "supabase" in config.provider_ids:
-            make_conninfo(config.supabase_database_url)
-        if "mongodb" in config.provider_ids:
-            parse_uri(config.mongodb_uri)
+        make_conninfo(config.neon_database_url)
     except Exception:
         raise ConfigurationError("A provider connection configuration is invalid") from None
 
@@ -90,30 +80,12 @@ def create_provider_registry(settings: Settings | None = None) -> ProviderRegist
                 timeout_seconds=timeout,
             )
         )
-    if "mongodb" in config.provider_ids:
-        adapters.append(
-            MongoDBAdapter(
-                uri=config.mongodb_uri,
-                database=config.mongodb_database,
-                collection=config.mongodb_collection,
-                timeout_seconds=timeout,
-            )
-        )
     if "firebase" in config.provider_ids:
         adapters.append(
             FirebaseAdapter(
                 project_id=config.firebase_project_id,
                 collection=config.firestore_collection,
                 credentials_path=config.firebase_credentials_path,
-                timeout_seconds=timeout,
-            )
-        )
-    if "supabase" in config.provider_ids:
-        adapters.append(
-            SupabaseAdapter(
-                database_url=config.supabase_database_url,
-                schema=config.supabase_schema,
-                table=config.supabase_table,
                 timeout_seconds=timeout,
             )
         )

@@ -60,6 +60,9 @@ class BaseStorageAdapter(ABC):
     def health_check(self) -> HealthResult:
         raise NotImplementedError
 
+    def close(self) -> None:
+        """Release client resources; adapters without long-lived clients inherit this no-op."""
+
 
 def build_share_id(record_id: str, version: int, share_index: int) -> str:
     return f"firefly:{record_id}:v{version}:share:{share_index}"

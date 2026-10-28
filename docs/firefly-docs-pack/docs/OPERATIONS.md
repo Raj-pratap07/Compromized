@@ -14,19 +14,18 @@
 Required categories (exact names are in `.env.example`):
 - application auth token and environment;
 - SQLCipher DB path and stable encoded key;
-- Akeyless endpoint/auth and five key references;
+- Akeyless endpoint/auth and three active key references;
 - Upstash connection URL/token;
 - Neon connection string;
-- MongoDB URI/database/collection;
 - Firebase credentials path or supported application-default credentials;
-- Supabase PostgreSQL connection string/table/schema.
+- Neon PostgreSQL connection string/table/schema.
 
 The `.env.example` contains placeholders only. Validate the shape of every required value on startup. Do not print values on validation error.
 
 ## 3. Akeyless account readiness
 
 Before coding all adapters:
-- verify the active account can create/use five AES-256-GCM keys;
+- verify the active account can use three AES-256-GCM keys;
 - verify Encrypt/Decrypt operation limits;
 - verify the authentication method and least-privilege access to those keys;
 - test binary input/output via Base64 with a record/index/provider/version context;
@@ -35,6 +34,8 @@ Before coding all adapters:
 API-key authentication is acceptable for the short hackathon proof of concept, but Akeyless does not recommend it for production. Revisit workload identity/cloud IAM if the project is deployed beyond the demo.
 
 ## 4. SQLCipher readiness
+
+First-time setup is the explicit `python -m scripts.init_db`; normal startup refuses to create or replace the database and stops on a wrong key, missing schema, or failed `cipher_integrity_check`. On every start the app also reconciles `PENDING`/`CLEANUP_REQUIRED` records; check the startup log line `startup reconciliation ...` after a crash.
 
 - Install selected SQLCipher-backed Python driver on the actual OS before implementation proceeds.
 - Verify runtime reports SQLCipher version.
@@ -53,4 +54,8 @@ API-key authentication is acceptable for the short hackathon proof of concept, b
 
 ## 6. Demo safety
 
-Use synthetic test secrets only. Rotate any test credential pasted into a chat, agent prompt, screenshot, log or public repository. The public demo must not show real connection strings or secret values except a clearly synthetic example.
+Use synthetic test secrets only. The API bearer token maps every authenticated request to the fixed `demo-owner`; it is not user identity or multi-tenant authorization. Bind the server to `127.0.0.1`, protect `.env`, and do not describe the demo as production-ready. Recovery returns plaintext: never log, persist, screenshot, or share response bodies.
+
+At startup, verify the log's profile, provider IDs, 3/2 threshold, and metadata DB path. Run `.\.venv\Scripts\python.exe -m scripts.check_services` before a demo: it performs provider health probes and Akeyless synthetic encrypt/decrypt checks without writing provider objects. `GET /health` only confirms that the app responds; it is not a cloud readiness check.
+
+Provider operations are sequential and do not share a transaction. If a store fails or times out, inspect both the record status and remote objects; a failed HTTP response does not prove that no ciphertext was stored. `CLEANUP_REQUIRED` means cleanup could not be confirmed. The active metadata file ends in `.three-provider`; switching to it does not migrate or read records from the legacy database file.

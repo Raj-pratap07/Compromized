@@ -1,40 +1,14 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import JSONResponse
 
-from app.api.dependencies import require_auth
+from app.api.dependencies import get_orchestrator, require_auth
 from app.api.schemas import SecretCreateRequest, SecretCreateResponse, SecretRecoverResponse, SecretStatusResponse
 from app.core.config import get_settings
-from app.db.repository import SecretRepository
-from app.services.akeyless_service import AkeylessService
 from app.services.orchestrator import StorageOrchestrator
-from app.services.sss_service import SSSService
-from app.storage.registry import create_provider_registry
 
 router = APIRouter()
-
-
-def get_orchestrator() -> StorageOrchestrator:
-    settings = get_settings()
-    provider_registry = create_provider_registry(settings)
-    repository = SecretRepository(
-        settings.database_path,
-        settings.sqlcipher_key,
-        share_count=settings.share_count,
-        threshold=settings.threshold,
-    )
-    return StorageOrchestrator(
-        repository=repository,
-        sss_service=SSSService(
-            share_count=settings.share_count,
-            threshold=settings.threshold,
-        ),
-        akeyless_service=AkeylessService(),
-        provider_registry=provider_registry,
-    )
 
 
 @router.get("/health")
@@ -46,18 +20,18 @@ def health() -> dict[str, str]:
 def create_secret(
     request: SecretCreateRequest,
     _token: str = Depends(require_auth),
+    orchestrator: StorageOrchestrator = Depends(get_orchestrator),
 ) -> SecretCreateResponse:
     settings = get_settings()
     if len(request.secret.encode("utf-8")) > settings.max_secret_bytes:
-        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Secret is too large")
-    orchestrator = get_orchestrator()
+        raise HTTPException(status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail="Secret is too large")
     result = orchestrator.store_secret("demo-owner", request.secret)
     return SecretCreateResponse(
         record_id=result["record_id"],
         status=result["status"],
         share_count=result["share_count"],
         threshold=result["threshold"],
-        created_at=datetime.now(timezone.utc).isoformat(),
+        created_at=result["created_at"],
     )
 
 
@@ -65,8 +39,8 @@ def create_secret(
 def recover_secret(
     record_id: str,
     _token: str = Depends(require_auth),
+    orchestrator: StorageOrchestrator = Depends(get_orchestrator),
 ) -> JSONResponse:
-    orchestrator = get_orchestrator()
     secret = orchestrator.recover_secret(record_id, "demo-owner")
     return JSONResponse(
         content={"record_id": record_id, "secret": secret},
@@ -78,12 +52,11 @@ def recover_secret(
 def get_status(
     record_id: str,
     _token: str = Depends(require_auth),
+    orchestrator: StorageOrchestrator = Depends(get_orchestrator),
 ) -> SecretStatusResponse:
-    orchestrator = get_orchestrator()
     record = orchestrator.get_status(record_id, "demo-owner")
     return SecretStatusResponse(
         record_id=record["record_id"],
-        owner_id=record["owner_id"],
         version=record["version"],
         status=record["status"],
         threshold=record["threshold"],

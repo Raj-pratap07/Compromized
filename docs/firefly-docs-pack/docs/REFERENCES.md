@@ -24,11 +24,8 @@ These references informed the architecture and implementation constraints. Check
 ## Providers
 - Upstash Redis docs: https://upstash.com/docs/redis/overall/getstarted
 - Neon Python/connection guides: https://neon.tech/docs/guides/python
-- PyMongo current guide: https://www.mongodb.com/docs/languages/python/pymongo-driver/current/
 - Firestore server SDK quickstart (Python): https://firebase.google.com/docs/firestore/quickstart-server
 - Firestore add/update data: https://firebase.google.com/docs/firestore/manage-data/add-data
-- Supabase PostgreSQL connections: https://supabase.com/docs/guides/database/connecting-to-postgres
-- Supabase Python insert/upsert/delete references if using the SDK instead of direct PostgreSQL: https://supabase.com/docs/reference/python/insert | https://supabase.com/docs/reference/python/upsert | https://supabase.com/docs/reference/python/delete
 
 ## Cryptography and secrets
 - AES-GCM semantics, AAD, nonce uniqueness: https://cryptography.io/en/stable/hazmat/primitives/aead/

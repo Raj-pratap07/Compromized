@@ -7,9 +7,7 @@
 
 ## 1. Product summary
 
-In the default `full` profile, Firefly stores one sensitive string/secret by splitting it into five Shamir shares with a threshold of three. Each share is encrypted using an Akeyless AES-256-GCM key dedicated to its storage provider, then stored by one independent provider. Firefly can recover the original secret when any three valid shares can be retrieved and decrypted. Metadata is held in a SQLCipher-encrypted SQLite database.
-
-For temporary synthetic integration tests only, the human-approved `three_provider` profile uses Upstash, Neon, and Firestore with three shares and threshold two. The default remains the full five-provider 5/3 design.
+Firefly stores one synthetic demo secret by splitting it into three Shamir shares with a threshold of two. Each share is encrypted using an Akeyless AES-256-GCM key dedicated to its storage provider, then stored in Upstash, Neon, or Firestore. Firefly can recover the original secret when any two distinct valid shares can be retrieved and decrypted. Metadata is held in a SQLCipher-encrypted SQLite database.
 
 ## 2. Problem
 
@@ -17,10 +15,10 @@ A single database or storage-provider compromise should not automatically expose
 
 ## 3. Goals
 
-- Store one secret as five cryptographic shares with a 3-of-5 threshold.
+- Store one synthetic demo secret as three cryptographic shares with a 2-of-3 threshold.
 - Encrypt each share through Akeyless before the share is persisted by a provider.
-- Store exactly one share per provider across five services.
-- In the default profile, recover from any three valid shares belonging to the same record/version.
+- Store exactly one share per provider across Upstash, Neon, and Firestore.
+- Recover from any two valid shares belonging to the same record/version.
 - Track operation progress and handle provider failures without falsely reporting success.
 - Protect metadata at rest with SQLCipher.
 - Avoid plaintext secrets/shares in logs and intentional temporary files.
@@ -50,11 +48,11 @@ A single database or storage-provider compromise should not automatically expose
 
 ### FR-1 Store a secret
 
-The API accepts one secret in an HTTPS request body. It validates authentication, authorization, size and format before invoking the orchestrator. A successful response returns the random `record_id`, `status=AVAILABLE`, `share_count=5`, and `threshold=3`; it never echoes the secret.
+The API accepts one synthetic demo secret in a request body. It validates authentication, size and format before invoking the orchestrator. A successful response returns the random `record_id`, `status=AVAILABLE`, `share_count=3`, and `threshold=2`; it never echoes the secret.
 
 ### FR-2 Split
 
-Use a reviewed SSS library to create the configured profile's shares (default five shares with threshold three). Do not implement Shamir's algorithm manually. Record each share's index and version. Do not use secret content in IDs.
+Use a reviewed SSS library to create three shares with threshold two. Do not implement Shamir's algorithm manually. Record each share's index and version. Do not use secret content in IDs.
 
 ### FR-3 Encrypt
 
@@ -62,7 +60,7 @@ Encrypt each share using the provider's assigned Akeyless key reference. Use Ake
 
 ### FR-4 Distribute
 
-Write one opaque Akeyless ciphertext to each of: Upstash Redis, Neon PostgreSQL, MongoDB Atlas, Firebase Firestore, and Supabase PostgreSQL. Use a deterministic share ID for idempotent retry and cleanup. Do not configure TTL/expiration for shares.
+Write one opaque Akeyless ciphertext to each of: Upstash Redis, Neon PostgreSQL, and Firebase Firestore. Use a deterministic share ID for idempotent retry and cleanup. Do not configure TTL/expiration for shares.
 
 ### FR-5 Track progress
 
@@ -70,7 +68,7 @@ Create a durable `PENDING` record before external writes. Persist per-share stat
 
 ### FR-6 Recover
 
-Authenticate and authorize before retrieving shares. Retrieve candidates from available providers, validate record/version/provider/index, decrypt with the matching Akeyless key/context, and collect three distinct valid plaintext shares. Use SSS to reconstruct on the trusted backend. Return only to the authorized caller; set `Cache-Control: no-store`.
+Authenticate and authorize before retrieving shares. Retrieve candidates from available providers, validate record/version/provider/index, decrypt with the matching Akeyless key/context, and collect two distinct valid plaintext shares. Use SSS to reconstruct on the trusted backend. Return only to the authorized caller; set `Cache-Control: no-store`.
 
 ### FR-7 Failure handling
 
@@ -78,7 +76,7 @@ For a confirmed write, persist `STORED`. For an explicit failure, persist the fa
 
 ### FR-8 Metadata security
 
-Use SQLCipher rather than the standard unencrypted SQLite driver. Load its stable key from protected configuration before database use. Verify the driver actually links SQLCipher. On wrong key/integrity failure, fail closed and do not silently create a new database. The SQLCipher key must be separate from the five Akeyless keys.
+Use SQLCipher rather than the standard unencrypted SQLite driver. Load its stable key from protected configuration before database use. Verify the driver actually links SQLCipher. On wrong key/integrity failure, fail closed and do not silently create a new database. The SQLCipher key must be separate from the three Akeyless keys.
 
 ### FR-9 Cleanup
 
@@ -100,11 +98,11 @@ Expose a basic health endpoint that does not reveal secrets, credentials, raw pr
 
 ## 8. MVP acceptance criteria
 
-1. Round-trip a test secret through SSS and recover from every 3-share combination (10 combinations).
-2. Two shares cannot successfully recover the secret; the application rejects recovery before calling reconstruction with fewer than three.
+1. Round-trip a synthetic test secret through SSS and recover from every 2-share combination (3 combinations).
+2. One share cannot successfully recover the secret; the application rejects recovery before calling reconstruction with fewer than two.
 3. Every stored share is Akeyless ciphertext; plaintext shares and original secret never appear in provider payloads or metadata.
-4. All five provider writes are confirmed before status becomes `AVAILABLE`.
-5. One provider unavailable during recovery can be tolerated if three other providers work.
+4. All three provider writes are confirmed before status becomes `AVAILABLE`.
+5. One provider unavailable during recovery can be tolerated if the other two providers work.
 6. Akeyless context/key mismatch or ciphertext tampering causes candidate rejection.
 7. A timed-out write becomes `UNKNOWN` and is reconciled before cleanup/retry.
 8. A failed store attempts rollback; incomplete cleanup is recorded as `CLEANUP_REQUIRED`.
@@ -116,9 +114,9 @@ Expose a basic health endpoint that does not reveal secrets, credentials, raw pr
 
 1. Store a synthetic secret and show the returned record ID/status.
 2. Inspect provider records and show each has opaque ciphertext, not plaintext.
-3. Recover the secret with three providers and show exact equality against the input.
-4. Temporarily make two providers unavailable; recovery should still work if the other three are available.
-5. In the default profile, try recovery with fewer than three valid shares; it must fail. In the temporary test profile, fewer than two valid shares must fail.
+3. Recover the secret with two providers and show exact equality against the input, without logging or persisting the response.
+4. Temporarily make one provider unavailable; recovery should still work if the other two are available.
+5. Try recovery with fewer than two valid shares; it must fail.
 6. Tamper with a ciphertext or encryption context in a controlled test; Akeyless must reject it.
 7. Simulate a failed/uncertain write and show the state/rollback result.
 8. Demonstrate that SQLCipher requires its key and that metadata does not contain the secret.

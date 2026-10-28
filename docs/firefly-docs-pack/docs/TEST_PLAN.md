@@ -3,9 +3,8 @@
 ## 1. Unit tests (no network)
 
 ### SSS
-- In the default profile, a fixed test secret splits into five unique shares.
-- In the temporary profile, a fixed test secret splits into three unique shares.
-- Every one of the 10 combinations of three shares recovers identical original bytes.
+- The only supported profile splits a fixed synthetic test secret into three unique shares.
+- Every one of the 3 combinations of two shares recovers identical original bytes.
 - The application wrapper rejects fewer than the active profile threshold before reconstruction.
 - Duplicate indices and cross-record/cross-version share mixing are rejected.
 - Invalid/malformed share input fails safely.
@@ -26,7 +25,7 @@
 - Unknown states are rejected; timestamps UTC; owner is checked.
 
 ### Orchestrator with fake adapters
-- Happy store calls SSS once, Akeyless five times, and each adapter's put once.
+- Happy store calls SSS once, Akeyless three times, and each adapter's put once.
 - Failure at each share/provider index triggers rollback of stored/possible copies.
 - A timeout produces UNKNOWN and queries deterministic ID before blind retry.
 - Cleanup failure produces CLEANUP_REQUIRED.
@@ -46,20 +45,17 @@ For each provider:
 - credentials are restricted to the Firefly collection/table/keyspace where possible.
 - timeout/error classifications are normalized.
 
-Provider set:
-1. Upstash Redis
-2. Neon PostgreSQL
-3. MongoDB Atlas
-4. Firebase Firestore
-5. Supabase PostgreSQL
+Provider set (the only supported profile):
+1. Upstash Redis (share 1)
+2. Neon PostgreSQL (share 2)
+3. Firebase Firestore (share 3)
 
 ## 3. End-to-end tests
 
-- In the default profile, store secret -> all 5 encrypted shares stored -> status AVAILABLE -> recover exact secret.
-- In the temporary profile, store synthetic secret -> all 3 encrypted shares stored -> status AVAILABLE -> recover with any 2.
-- Exercise all 10 share combinations.
-- Simulate any two providers unavailable; recover from the remaining three.
-- Simulate three unavailable; recovery fails without returning partial plaintext.
+- Store a synthetic secret -> all 3 encrypted shares stored -> status AVAILABLE -> recover with any 2.
+- Exercise all 3 two-share combinations.
+- Simulate one provider unavailable; recover from the remaining two.
+- Simulate two unavailable; recovery fails without returning partial plaintext.
 - Alter ciphertext, key reference, record ID, version, provider ID or share index; recovery rejects the invalid candidate.
 - Akeyless outage fails recovery safely and does not return any partial result.
 - SQLCipher key/integrity failure prevents sensitive operations.

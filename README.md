@@ -1,20 +1,18 @@
 # Firefly
 
-Firefly is a synchronous FastAPI MVP. Its default `full` profile splits a
-secret into five Shamir shares (threshold three), encrypts each share with its
-configured Akeyless key, and stores one ciphertext per provider. SQLCipher
-protects local metadata.
+Firefly is a synchronous FastAPI hackathon demo. It splits a secret into three
+Shamir shares (threshold two), encrypts each share with its configured
+Akeyless key, and stores one ciphertext each in Upstash, Neon, and Firestore.
+SQLCipher protects local metadata.
 
 See [Implemented architecture and workflow](./docs/firefly-docs-pack/docs/IMPLEMENTED_ARCHITECTURE.md)
 for diagrams based on the code currently wired into the application.
 
-For temporary integration testing while MongoDB Atlas and Supabase are
-unavailable, set `FIREFLY_PROFILE=three_provider` in `.env`. This profile uses
-Upstash, Neon, and Firestore with three shares and a threshold of two. It is
-for synthetic test data only and does not replace the default 5/3 design.
-Firefly automatically uses a separate SQLCipher metadata file for this profile;
-switching back to `FIREFLY_PROFILE=full` restores the full profile and its
-existing records without a migration. Records are not shared across profiles.
+The only supported setup is `FIREFLY_PROFILE=three_provider` with the fixed
+3-share / 2-threshold configuration. The app defaults to this profile if the
+variable is absent and rejects other profile values. The SQLCipher database
+uses a `.three-provider` filename suffix to avoid reusing older five-provider
+metadata; records in that older file are not migrated.
 
 ## Local setup
 
@@ -28,20 +26,29 @@ existing records without a migration. Records are not shared across profiles.
 3. Copy `.env.example` to `.env` and set the local API token, a Base64-encoded
    32-byte SQLCipher key, Akeyless credentials/key references, and provider
    connection settings. Do not paste credentials into chat or commit `.env`.
-4. In the default `full` profile, provision the Neon and Supabase tables and
-   the MongoDB collection before running Firefly. The `three_provider` profile
-   does not require the MongoDB or Supabase configuration. See
+4. Create the encrypted metadata database once with
+   `.\.venv\Scripts\python.exe -m scripts.init_db`. Normal startup never creates
+   it: a missing file, wrong key, or failed integrity check stops the app.
+   Keep the same `SQLCIPHER_KEY_B64` afterwards.
+5. Provision the Neon table and Firestore collection. See
    [Provider setup](./docs/firefly-docs-pack/docs/PROVIDER_SETUP.md) for the
-   required schema and credential boundaries.
-5. Start the API:
+   schema and credential boundaries.
+6. Run the read-only live dependency preflight with
+   `.\.venv\Scripts\python.exe -m scripts.check_services`. It checks Akeyless
+   encrypt/decrypt and the three provider health probes without writing shares.
+7. Start the API (it also reconciles unfinished records from a previous crash):
 
    ```powershell
    python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
    ```
 
-The API uses the configured bearer token for the local demo. Keep it on
-localhost and use HTTPS when deployed. The recovery endpoint returns the
-plaintext secret and must only be used by an authorized caller.
+The API uses a single configured bearer token mapped to `demo-owner`; this is
+demo authentication, not user identity or multi-tenant authorization. Keep the
+API bound to localhost. Recovery returns plaintext, so use only a synthetic
+demo secret and do not log, persist, screenshot, or share recovery response
+bodies. Startup logs show the active profile, provider IDs, threshold, and
+metadata DB path. `/health` confirms only that the app responds; use the
+preflight and an end-to-end synthetic test to establish cloud readiness.
 
 ## Tests
 
@@ -50,6 +57,14 @@ python -m pytest -q tests
 ```
 
 The unit tests use fake service clients and do not contact cloud providers.
+The fake Akeyless is not cryptography; `tests/test_real_crypto.py` checks real
+AES-GCM behavior against Akeyless and runs only when `FIREFLY_LIVE_TESTS=1`.
 Live store/recover tests write external ciphertext records; use dedicated test
 projects and a synthetic secret, then verify cleanup. Never use production
 credentials for integration tests.
+
+## Demo
+
+`python -m scripts.demo` runs an interactive offline rehearsal (1 share fails, 2 or 3 rebuild);
+`python -m scripts.demo --live` runs it against the real services. See
+[Hackathon verification](./docs/firefly-docs-pack/docs/HACKATHON_VERIFICATION.md).

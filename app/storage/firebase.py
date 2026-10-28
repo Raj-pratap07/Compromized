@@ -111,6 +111,11 @@ class FirebaseAdapter(BaseStorageAdapter):
         except GoogleAPICallError:
             return DeleteResult(self.provider_id, share_id, "DELETE_FAILED", False, False)
 
+    def close(self) -> None:
+        close = getattr(self.client, "close", None)
+        if callable(close):
+            close()
+
     def health_check(self) -> HealthResult:
         try:
             self._collection.limit(1).get(timeout=self.timeout_seconds)

@@ -4,21 +4,19 @@ The application loads `.env` from the repository root and does not print its
 values. Keep `.env`, provider credentials, and Firebase service-account files
 out of source control.
 
-The default `FIREFLY_PROFILE=full` requires all five provider configurations.
-For temporary synthetic integration tests while MongoDB Atlas and Supabase are
-unavailable, set `FIREFLY_PROFILE=three_provider`. That profile uses Upstash,
-Neon, and Firestore with 3 shares / threshold 2 and does not require MongoDB or
-Supabase configuration. It is not the production/default design. It uses a
+The only supported `FIREFLY_PROFILE` is `three_provider`, which uses Upstash,
+Neon, and Firestore with 3 shares / threshold 2. It is the default when unset;
+other profile values are rejected. The app rejects production environment
+configuration because its authentication is demo-only. The profile uses a
 separate SQLCipher metadata database file (based on `SQLCIPHER_DATABASE_PATH`
-with `.three-provider` added to the filename), so profile records are isolated
-and no schema migration is performed when switching profiles.
+with `.three-provider` added to the filename); old metadata is preserved but
+not migrated or read.
 
 ## Akeyless
 
 Use API-key authentication for this local proof of concept. Configure
-`AKEYLESS_ACCESS_ID`, `AKEYLESS_ACCESS_KEY`, and the key references for the
-active profile (all five for `full`; `upstash`, `neon`, and `firebase` for
-`three_provider`). Each active key must be enabled for AES-256-GCM and
+`AKEYLESS_ACCESS_ID`, `AKEYLESS_ACCESS_KEY`, and the `upstash`, `neon`, and
+`firebase` key references. Each active key must be enabled for AES-256-GCM and
 accessible to the configured Akeyless identity.
 
 The service calls the documented `/auth`, `/encrypt`, and `/decrypt` REST
@@ -41,21 +39,21 @@ database. The adapter issues Redis `SET`, `GET`, `DEL`, and `PING` commands
 through the REST endpoint. Share writes use no TTL. Configure the database
 eviction policy so ciphertext records are not evicted.
 
-## Neon and Supabase
+## Neon
 
-Both adapters use psycopg over TLS. Provision a dedicated table before running
+The adapter uses psycopg over TLS. Provision a dedicated table before running
 the application; the application does not create or migrate provider schemas.
-Set the corresponding schema and table variables in `.env`. The defaults are
+Set the schema and table variables in `.env`. The defaults are
 `public.firefly_shares`.
 
-Create a table with this shape in each PostgreSQL project:
+Create a table with this shape:
 
 ```sql
 CREATE TABLE public.firefly_shares (
     share_id TEXT PRIMARY KEY,
     record_id TEXT NOT NULL,
     version INTEGER NOT NULL,
-    share_index SMALLINT NOT NULL CHECK (share_index BETWEEN 1 AND 5),
+    share_index SMALLINT NOT NULL CHECK (share_index BETWEEN 1 AND 3),
     provider_id TEXT NOT NULL,
     key_ref TEXT NOT NULL,
     format_version SMALLINT NOT NULL,
@@ -65,16 +63,9 @@ CREATE TABLE public.firefly_shares (
 ```
 
 If custom schema/table names are configured, substitute those identifiers in
-the DDL and in `NEON_SCHEMA`, `NEON_TABLE`, `SUPABASE_SCHEMA`, and
-`SUPABASE_TABLE`. Grant each database role access only to its dedicated table.
-The adapters fail closed when the configured table is absent or incompatible.
-
-## MongoDB Atlas
-
-Set `MONGODB_URI`, `MONGODB_DATABASE`, and `MONGODB_COLLECTION`. Create the
-database/collection beforehand and grant the application role access only to
-that collection. Documents use the deterministic share ID as `_id`; ciphertext
-is stored without an expiration index.
+the DDL and in `NEON_SCHEMA` / `NEON_TABLE`. Grant the database role access
+only to its dedicated table. The adapter fails closed when the configured
+table is absent or incompatible.
 
 ## Firebase Firestore
 

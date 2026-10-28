@@ -9,16 +9,15 @@ from typing import Dict
 
 from dotenv import load_dotenv
 
+from app.core.errors import ConfigurationError
+
 
 PROVIDER_PROFILES = {
-    "full": ("upstash", "neon", "mongodb", "firebase", "supabase"),
     "three_provider": ("upstash", "neon", "firebase"),
 }
 
 
-def profile_database_path(configured_path: Path, profile: str) -> str:
-    if profile != "three_provider":
-        return str(configured_path)
+def profile_database_path(configured_path: Path) -> str:
     suffix = configured_path.suffix or ".db"
     stem = configured_path.stem
     if not stem.endswith(".three-provider"):
@@ -28,7 +27,7 @@ def profile_database_path(configured_path: Path, profile: str) -> str:
 
 @dataclass(frozen=True)
 class Settings:
-    profile: str = "full"
+    profile: str = "three_provider"
     environment: str = "development"
     api_token: str = field(default="", repr=False)
     max_secret_bytes: int = 4096
@@ -46,22 +45,21 @@ class Settings:
     neon_database_url: str = field(default="", repr=False)
     neon_schema: str = "public"
     neon_table: str = "firefly_shares"
-    mongodb_uri: str = field(default="", repr=False)
-    mongodb_database: str = "firefly"
-    mongodb_collection: str = "shares"
     firebase_project_id: str = ""
     firebase_credentials_path: str = field(default="", repr=False)
     firestore_collection: str = "firefly_shares"
-    supabase_database_url: str = field(default="", repr=False)
-    supabase_schema: str = "public"
-    supabase_table: str = "firefly_shares"
     provider_timeout_seconds: float = 10.0
 
     def __post_init__(self) -> None:
         if self.profile not in PROVIDER_PROFILES:
-            raise ValueError("FIREFLY_PROFILE must be 'full' or 'three_provider'")
-        if self.environment.lower() == "production" and self.profile != "full":
-            raise ValueError("Production deployments must use the full provider profile")
+            raise ValueError("Only FIREFLY_PROFILE=three_provider is supported")
+        if self.environment.lower() == "production":
+            raise ValueError("The hackathon demo does not support production deployments")
+
+    def require_api_token(self) -> None:
+        """Startup check: the demo bearer token must be configured and non-blank."""
+        if not self.api_token.strip():
+            raise ConfigurationError("FIREFLY_API_TOKEN is not configured")
 
     @property
     def provider_ids(self) -> tuple[str, ...]:
@@ -73,7 +71,7 @@ class Settings:
 
     @property
     def threshold(self) -> int:
-        return 3 if self.profile == "full" else 2
+        return 2
 
     @property
     def sqlcipher_key(self) -> str:
@@ -91,9 +89,11 @@ class Settings:
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
-    profile = os.getenv("FIREFLY_PROFILE", "full").strip().lower()
+    profile = os.getenv("FIREFLY_PROFILE", "three_provider").strip().lower()
     configured_db_path = Path(os.getenv("SQLCIPHER_DATABASE_PATH", "./data/firefly.db"))
-    db_path = profile_database_path(configured_db_path, profile)
+    if profile not in PROVIDER_PROFILES:
+        raise ValueError("Only FIREFLY_PROFILE=three_provider is supported")
+    db_path = profile_database_path(configured_db_path)
     db_key_b64 = os.getenv("SQLCIPHER_KEY_B64", "")
     return Settings(
         profile=profile,
@@ -108,23 +108,15 @@ def get_settings() -> Settings:
         akeyless_key_refs={
             "upstash": os.getenv("AKEYLESS_KEY_UPSTASH", ""),
             "neon": os.getenv("AKEYLESS_KEY_NEON", ""),
-            "mongodb": os.getenv("AKEYLESS_KEY_MONGODB", ""),
             "firebase": os.getenv("AKEYLESS_KEY_FIREBASE", ""),
-            "supabase": os.getenv("AKEYLESS_KEY_SUPABASE", ""),
         },
         upstash_rest_url=os.getenv("UPSTASH_REDIS_REST_URL", ""),
         upstash_rest_token=os.getenv("UPSTASH_REDIS_REST_TOKEN", ""),
         neon_database_url=os.getenv("NEON_DATABASE_URL", ""),
         neon_schema=os.getenv("NEON_SCHEMA", "public"),
         neon_table=os.getenv("NEON_TABLE", "firefly_shares"),
-        mongodb_uri=os.getenv("MONGODB_URI", ""),
-        mongodb_database=os.getenv("MONGODB_DATABASE", "firefly"),
-        mongodb_collection=os.getenv("MONGODB_COLLECTION", "shares"),
         firebase_project_id=os.getenv("FIREBASE_PROJECT_ID", ""),
         firebase_credentials_path=os.getenv("GOOGLE_APPLICATION_CREDENTIALS", ""),
         firestore_collection=os.getenv("FIRESTORE_COLLECTION", "firefly_shares"),
-        supabase_database_url=os.getenv("SUPABASE_DATABASE_URL", ""),
-        supabase_schema=os.getenv("SUPABASE_SCHEMA", "public"),
-        supabase_table=os.getenv("SUPABASE_TABLE", "firefly_shares"),
         provider_timeout_seconds=float(os.getenv("FIREFLY_PROVIDER_TIMEOUT_SECONDS", "10")),
     )

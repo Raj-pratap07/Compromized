@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import base64
+import threading
 import time
 from datetime import datetime, timezone
 from typing import Any, Dict, Mapping
 
 import requests
 
-from app.core.config import get_settings
+from app.core.config import Settings, get_settings
 from app.core.errors import ConfigurationError, ProviderError
 
 
@@ -16,13 +17,14 @@ class AkeylessService:
         self,
         key_refs: Mapping[str, str] | None = None,
         *,
+        settings: Settings | None = None,
         api_url: str | None = None,
         access_id: str | None = None,
         access_key: str | None = None,
         session: requests.Session | None = None,
         timeout: tuple[float, float] = (5.0, 15.0),
     ):
-        self.settings = get_settings()
+        self.settings = settings or get_settings()
         self.key_refs = dict(self.settings.akeyless_key_refs)
         if key_refs is not None:
             self.key_refs.update(key_refs)
@@ -33,6 +35,10 @@ class AkeylessService:
         self.timeout = timeout
         self._token: str | None = None
         self._token_expires_at = 0.0
+        self._token_lock = threading.Lock()
+
+    def close(self) -> None:
+        self.session.close()
 
     @staticmethod
     def build_encryption_context(
@@ -57,6 +63,10 @@ class AkeylessService:
             raise ConfigurationError("Configured Akeyless key reference is invalid")
 
     def _get_token(self) -> str:
+        with self._token_lock:
+            return self._get_token_locked()
+
+    def _get_token_locked(self) -> str:
         if self._token and time.monotonic() < self._token_expires_at:
             return self._token
         if not self.access_id or not self.access_key:

@@ -8,7 +8,7 @@ Tasks:
 - Inspect existing repo, branch, uncommitted work and current files.
 - Create/activate venv and establish supported Python version.
 - Confirm SQLCipher driver installs and reports SQLCipher.
-- Confirm Akeyless account has five usable AES-256-GCM keys and enough API operations for the default profile.
+- Confirm Akeyless account has three usable AES-256-GCM keys and enough API operations for the demo.
 - Verify credentials are not tracked.
 
 Done when: environment checks are documented and a minimal test can open an encrypted SQLCipher DB.
@@ -16,7 +16,7 @@ Done when: environment checks are documented and a minimal test can open an encr
 ## Milestone 1 — Contracts and configuration
 
 Tasks:
-- Add typed settings for app auth token, SQLCipher key, five provider connections, Akeyless auth and key references, and the explicit temporary test profile.
+- Add typed settings for app auth token, SQLCipher key, three provider connections, Akeyless auth and key references, and the fixed 3/2 profile.
 - Fail at startup if required config is missing or malformed (except optional test mode).
 - Define `ProviderId`, `ShareEnvelope`, `PutOutcome`, `DeleteOutcome`, record/share statuses.
 - Define API request/response schemas.
@@ -38,19 +38,19 @@ Done when: correct key opens DB; wrong key fails; no plaintext secret fields exi
 Tasks:
 - Evaluate candidate maintained SSS libraries; do not invent arithmetic.
 - Choose based on review, API, supported payload size, secure randomness, license and tests.
-- Implement thin wrapper with 5/3 defaults and clear validation; support the approved temporary 3/2 test configuration.
+- Implement thin wrapper with fixed 3/2 configuration and clear rejection of unsupported settings.
 
-Done when: 5 shares created; all 10 three-share combinations recover exact bytes; fewer-than-three requests are rejected by wrapper; duplicate/malformed share test cases rejected where supported.
+Done when: 3 shares created; all 3 two-share combinations recover exact bytes; fewer-than-two requests are rejected by wrapper; duplicate/malformed share test cases rejected where supported.
 
 ## Milestone 4 — Akeyless service spike
 
 Tasks:
 - Configure one test key and exercise Encrypt/Decrypt end to end.
 - Verify Base64 representation for bytes and context match behavior.
-- Then map five distinct keys to five providers for the default profile.
+- Then map three distinct keys to the three active providers.
 - Normalize errors/timeouts; never log secret or token.
 
-Done when: binary test vectors round-trip exactly; wrong context/ciphertext fails; configured key mapping is enforced. If Akeyless plan doesn't support five keys, stop and bring the issue to the human rather than silently switching design.
+Done when: binary test vectors round-trip exactly; wrong context/ciphertext fails; configured key mapping is enforced. If Akeyless plan doesn't support three keys, stop and bring the issue to the human rather than silently switching design.
 
 ## Milestone 5 — One storage adapter
 
@@ -58,9 +58,9 @@ Recommended first adapter: the easiest provider the team can provision reliably.
 
 Done when: put → get equals stored opaque envelope; repeated put is idempotent; delete works; unavailable provider and timeout are represented as distinct outcomes; logs are redacted.
 
-## Milestone 6 — Remaining four adapters
+## Milestone 6 — Remaining two adapters
 
-Implement Upstash, Neon, MongoDB Atlas, Firestore and Supabase one at a time against the same interface. Avoid building all five before testing the contract.
+Implement the remaining two providers (Neon and Firestore, if Upstash is the first) against the same interface. Avoid building all three before testing the contract.
 
 Done when: adapter-specific integration tests pass with isolated credentials and all writes use deterministic IDs with no TTL.
 
@@ -74,7 +74,7 @@ Done when: fault-injection tests cover failure at each provider index, Akeyless 
 
 Implement owner authorization, record lookup, provider selection, share validation, Akeyless Decrypt, threshold collection, SSS rebuild and safe response.
 
-Done when: `full` recovers with all 10 share combinations and tolerates any two provider outages; `three_provider` recovers with each pair and tolerates one provider outage; both fail safely below threshold and never log/cache secrets.
+Done when: the three-provider setup recovers with each pair and tolerates one provider outage; it fails safely below threshold and never logs/caches secrets.
 
 ## Milestone 9 — FastAPI integration
 

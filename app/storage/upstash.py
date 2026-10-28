@@ -108,6 +108,9 @@ class UpstashAdapter(BaseStorageAdapter):
         except (ValueError, TypeError):
             return DeleteResult(self.provider_id, share_id, "DELETE_FAILED", False, False)
 
+    def close(self) -> None:
+        self.session.close()
+
     def health_check(self) -> HealthResult:
         try:
             response = self._command(["PING"])

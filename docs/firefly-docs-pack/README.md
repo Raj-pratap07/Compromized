@@ -2,7 +2,7 @@
 
 **Distributed Secret Storage with Threshold Recovery**
 
-Firefly accepts one secret, splits it into five Shamir shares with a 3-of-5 threshold, protects each share through Akeyless AES-256-GCM encryption, and stores each encrypted share in a different provider. SQLCipher-encrypted SQLite stores the metadata required to locate and manage the shares.
+Firefly accepts one secret, splits it into three Shamir shares with a 2-of-3 threshold, protects each share through Akeyless AES-256-GCM encryption, and stores one encrypted share each in Upstash, Neon, and Firestore. SQLCipher-encrypted SQLite stores the metadata required to locate and manage the shares.
 
 > **Agreed trust model:** the backend is trusted to handle the plaintext secret and plaintext shares during storage/recovery. Firefly is designed to reduce the risk from isolated storage-provider compromise and offline theft of the metadata database. It does **not** claim protection against a fully compromised backend process/host or an attacker with sufficient Akeyless permissions.
 
@@ -10,9 +10,9 @@ Firefly accepts one secret, splits it into five Shamir shares with a 3-of-5 thre
 
 - **API:** FastAPI, request validation, authentication/authorization, safe responses.
 - **Orchestrator:** coordinates store/recover operations, per-share progress, bounded retries, rollback.
-- **Secret sharing:** Shamir's Secret Sharing (5 shares, threshold 3).
+- **Secret sharing:** Shamir's Secret Sharing (3 shares, threshold 2).
 - **Share encryption:** Akeyless AES-256-GCM Encrypt/Decrypt APIs, one key reference per provider.
-- **Storage:** Upstash Redis, Neon PostgreSQL, MongoDB Atlas, Firebase Firestore, Supabase PostgreSQL.
+- **Storage:** Upstash Redis, Neon PostgreSQL, Firebase Firestore.
 - **Metadata:** SQLCipher-encrypted SQLite; stores ownership, IDs, mappings, versions, operation states—not the original secret or plaintext shares.
 - **Cleanup:** no intentional plaintext temporary files/logs; best-effort cleanup of mutable buffers in Python.
 
@@ -36,12 +36,12 @@ Mermaid source diagrams are in `docs/diagrams/`.
 
 ## Important implementation gates
 
-Before coding the full integration, verify these two dependencies early:
+Before running a live integration, verify these dependencies:
 
-1. The active Akeyless account can create/use **five AES-256-GCM encryption keys** and supports the required Encrypt/Decrypt operations within its limits.
+1. The active Akeyless account can use **three AES-256-GCM encryption keys** and supports the required Encrypt/Decrypt operations within its limits.
 2. The chosen Python SQLCipher driver installs on the team's target OS and actually reports/uses SQLCipher—not standard unencrypted `sqlite3`.
 
-The SSS package is deliberately not pinned in this documentation: the implementation agent must evaluate a maintained library for 5-of-3 sharing, arbitrary byte payload support, secure randomness, API correctness, licensing, and current compatibility. Do not implement Shamir arithmetic from scratch.
+The SSS package is deliberately not pinned in this documentation: the implementation agent must evaluate a maintained library for 3-of-2 sharing, arbitrary byte payload support, secure randomness, API correctness, licensing, and current compatibility. Do not implement Shamir arithmetic from scratch.
 
 ## Non-goals for the first hackathon MVP
 

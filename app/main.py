@@ -1,13 +1,50 @@
 from __future__ import annotations
 
+import logging
+from contextlib import asynccontextmanager
+from typing import AsyncIterator
+
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
 from app.api.routes import router
+from app.core.config import get_settings
 from app.core.errors import ConfigurationError, ProviderError, RecordNotFoundError, RecoveryError
+from app.services.factory import build_orchestrator
 
-app = FastAPI(title="Firefly", debug=False)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    settings.require_api_token()
+    orchestrator = build_orchestrator(settings)
+    logging.getLogger("firefly.runtime").info(
+        "Firefly demo profile=%s providers=%s shares=%d threshold=%d metadata_db=%s",
+        settings.profile,
+        ",".join(settings.provider_ids),
+        settings.share_count,
+        settings.threshold,
+        settings.database_path,
+    )
+    app.state.orchestrator = orchestrator
+    try:
+        orchestrator.reconcile_pending()
+        yield
+    finally:
+        app.state.orchestrator = None
+        orchestrator.close()
+
+
+app = FastAPI(title="Firefly", debug=False, lifespan=lifespan)
 app.include_router(router)
+
+
+@app.exception_handler(RequestValidationError)
+def handle_validation_error(_request: Request, exc: RequestValidationError) -> JSONResponse:
+    # FastAPI's default body echoes the submitted input, which here may be a secret.
+    errors = [{"loc": list(error["loc"]), "type": error["type"]} for error in exc.errors()]
+    return JSONResponse(status_code=422, content={"detail": errors})
 
 
 @app.exception_handler(RecordNotFoundError)

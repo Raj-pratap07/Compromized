@@ -11,8 +11,8 @@ Use two tables so the record lifecycle and per-share progress can be updated ind
 | `record_id` | TEXT PRIMARY KEY | Random opaque ID; never derived from secret |
 | `owner_id` | TEXT NOT NULL | Authorization ownership |
 | `version` | INTEGER NOT NULL, default 1 | Share-set version |
-| `share_count` | INTEGER NOT NULL, check matches active profile (5 or 3) | Fixed per profile |
-| `threshold` | INTEGER NOT NULL, check matches active profile (3 or 2) | Fixed per profile |
+| `share_count` | INTEGER NOT NULL, check equals 3 | Fixed |
+| `threshold` | INTEGER NOT NULL, check equals 2 | Fixed |
 | `status` | TEXT NOT NULL | `PENDING`, `AVAILABLE`, `FAILED`, `CLEANUP_REQUIRED`, `RECONCILIATION_REQUIRED`, optionally `DELETING`, `DELETE_INCOMPLETE` |
 | `created_at` | UTC timestamp text | Created time |
 | `updated_at` | UTC timestamp text | Last state update |
@@ -25,12 +25,12 @@ Use two tables so the record lifecycle and per-share progress can be updated ind
 |---|---|---|
 | `record_id` | TEXT FK → secret_records | Parent record |
 | `version` | INTEGER NOT NULL | Share set version |
-| `share_index` | INTEGER NOT NULL, check 1–share_count | Unique share index |
+| `share_index` | INTEGER NOT NULL, check 1–3 | Unique share index |
 | `provider_id` | TEXT NOT NULL, allow-listed | Fixed provider identity |
 | `share_id` | TEXT NOT NULL UNIQUE | Deterministic provider object ID |
 | `key_ref` | TEXT NOT NULL | Akeyless key reference, not key material |
-| `status` | TEXT NOT NULL | `NOT_STARTED`, `ENCRYPTED`, `STORED`, `UNKNOWN`, `WRITE_FAILED`, `DELETE_PENDING`, `DELETE_CONFIRMED` |
-| `attempt_count` | INTEGER default 0 | Retry tracking, bounded |
+| `status` | TEXT NOT NULL | `NOT_STARTED`, `STORED`, `UNKNOWN`, `WRITE_FAILED`, `DELETE_PENDING`, `DELETE_CONFIRMED` |
+| `attempt_count` | INTEGER default 0 | Number of provider write attempts; incremented only when a write is actually issued, not on every status change |
 | `last_attempt_at` | UTC timestamp nullable | Progress tracking |
 | `last_error_code` | TEXT nullable | Normalized safe error code |
 | `PRIMARY KEY` | `(record_id, version, share_index)` | No duplicate index per version |
@@ -71,7 +71,7 @@ Use a deterministic storage key/object ID based on record ID, version and share 
 - The database key is stable across restarts and stored outside the database.
 - Do not start a network request inside a DB transaction.
 - Commit `PENDING` before external work; commit per-share progress as operations finish; commit `AVAILABLE` only after all active-profile writes are confirmed.
-- The temporary `three_provider` profile uses a separate SQLCipher file from `full`; records are not migrated or shared between profiles.
+- The only supported `three_provider` profile uses a separate SQLCipher file from the legacy five-provider database; old records are preserved but not migrated or shared.
 - Do not silently recreate an existing DB that fails to open.
 - For a small MVP DB, run supported `PRAGMA cipher_integrity_check` at startup/maintenance and fail closed if it reports problems.
 - Do not implement custom metadata MAC in MVP. Do not claim the SQLCipher page HMAC detects logical changes made through a valid DB connection.

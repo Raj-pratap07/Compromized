@@ -9,10 +9,10 @@ Use the tasks in order. Do not ask one agent to build the entire system.
 **Prompt:** Evaluate SQLCipher Python drivers for current OS/Python. Implement only a minimal isolated test that creates an encrypted DB, verifies SQLCipher is active, closes/reopens with the correct key, fails with wrong key, and runs integrity check. Document package/version and exact commands. No schema yet.
 
 ## T2 — SSS dependency decision
-**Prompt:** Research maintained Python SSS packages that support 5 shares/threshold 3 and byte payloads up to 4 KiB. Compare docs/license/maintenance/randomness/tests. Do not write SSS math. Propose a package and add tests only after human approves selection.
+**Prompt:** Research maintained Python SSS packages that support 3 shares/threshold 2 and byte payloads up to 4 KiB. Compare docs/license/maintenance/randomness/tests. Do not write SSS math. Propose a package and add tests only after human approves selection.
 
 ## T3 — Akeyless binary round-trip
-**Prompt:** Using a synthetic test byte payload only, test Akeyless authentication, Encrypt with Base64 input and context, then Decrypt with Base64 output and identical context. Verify byte-for-byte equality and context-mismatch failure. Never print tokens or payload plaintext. Stop if account limits prevent five keys.
+**Prompt:** Using a synthetic test byte payload only, test Akeyless authentication, Encrypt with Base64 input and context, then Decrypt with Base64 output and identical context. Verify byte-for-byte equality and context-mismatch failure. Never print tokens or payload plaintext. Stop if account limits prevent three keys.
 
 ## T4 — Metadata repository
 **Prompt:** Implement the tables and repository from `DATA_MODEL.md` using the verified SQLCipher driver. Add tests for transactions, status transitions, owner lookup, and fail-closed open behavior. Don't integrate provider calls.
@@ -24,10 +24,10 @@ Use the tasks in order. Do not ask one agent to build the entire system.
 **Prompt:** Add one provider adapter at a time against the frozen interface. Add isolated integration tests. Do not change orchestrator or schema unless necessary; report any interface mismatch for human approval.
 
 ## T7 — Store orchestration
-**Prompt:** Implement storage state machine from `FAILURE_HANDLING.md` with fake adapters and injected failures first. Ensure status commits are short transactions and `AVAILABLE` requires five confirmed writes.
+**Prompt:** Implement storage state machine from `FAILURE_HANDLING.md` with fake adapters and injected failures first. Ensure status commits are short transactions and `AVAILABLE` requires all three confirmed writes.
 
 ## T8 — Recovery orchestration
-**Prompt:** Implement recovery with mocked providers/Akeyless first. Validate distinct indexes/version/context; collect the active profile threshold (three in `full`, two in `three_provider`); fail below threshold; clean mutable buffers on all paths.
+**Prompt:** Implement recovery with mocked providers/Akeyless first. Validate distinct indexes/version/context; collect two distinct valid shares; fail below threshold; clean mutable buffers on all paths.
 
 ## T9 — API wiring
 **Prompt:** Implement routes/schemas/auth according to `API_CONTRACT.md`. Routes stay thin. Test status codes and ensure sensitive response/log handling.

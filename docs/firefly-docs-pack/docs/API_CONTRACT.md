@@ -8,7 +8,7 @@ For the initial single-user hackathon demo, use a configured bearer token (`FIRE
 
 ## `POST /secrets`
 
-**Purpose:** create a new secret record and distribute shares to every active profile provider. The default profile distributes five.
+**Purpose:** create a new secret record and distribute a share to each of the three active providers.
 
 Request JSON:
 
@@ -20,9 +20,9 @@ Success `201`:
 
 - `record_id`: random opaque ID
 - `status`: `AVAILABLE`
-- `share_count`: `5` in `full`, `3` in `three_provider`
-- `threshold`: `3` in `full`, `2` in `three_provider`
-- `created_at`: UTC timestamp
+- `share_count`: `3`
+- `threshold`: `2`
+- `created_at`: the persisted record creation timestamp (UTC), identical to the value later returned by the status endpoint
 
 A secret must never be echoed in the response.
 
@@ -30,7 +30,7 @@ Possible errors: `400` invalid payload; `401` missing/invalid authentication; `4
 
 ## `POST /secrets/{record_id}/recover`
 
-**Purpose:** recover the secret from the configured profile's threshold of valid shares (three by default).
+**Purpose:** recover the secret from two distinct valid shares.
 
 Request body: empty or a minimal request ID if required for audit; secret is not sent again.
 
@@ -46,17 +46,20 @@ The response is sensitive and must not be logged or cached. Validate owner and `
 
 **Purpose:** show status to an authorized owner.
 
-Success `200` fields may include: `record_id`, `status`, `threshold`, `share_count`, `confirmed_shares` count, `created_at`, `updated_at`. Do not return secret/ciphertext, key material, credentials, or internal exception strings. Require authentication and owner authorization.
+Success `200` fields may include: `record_id`, `status`, `threshold`, `share_count`, `confirmed_shares` count, `created_at`, `updated_at`. The owner identifier is not returned. Do not return secret/ciphertext, key material, credentials, or internal exception strings. Require authentication and owner authorization.
 
 ## `GET /health`
 
-Return a minimal status such as `{"status":"ok"}` when the app and metadata dependency are ready. Do not expose DB paths, provider hostnames, key references, credentials, account IDs or detailed errors. A separate internal readiness check may probe dependencies if needed; do not make public health responses a secrets oracle.
+The current implementation returns `{"status":"ok"}` without checking SQLCipher or provider readiness. Do not use this endpoint alone to claim operational readiness. It must not expose DB paths, provider hostnames, key references, credentials, account IDs or detailed errors. Use the separate local preflight and a synthetic end-to-end test to verify dependencies.
 
 ## Deletion
 
 No public `DELETE /secrets/{id}` endpoint in initial MVP. `delete_share()` remains required internally for rollback after failed writes. Public permanent deletion can be added later with a documented retention/tombstone policy.
 
 ## Error handling
+
+- Request validation failures return `422` with only the field location and error type. The submitted value is never echoed, because it may be a secret.
+- A secret over the byte limit returns `413` (`HTTP_413_CONTENT_TOO_LARGE`).
 
 - Map internal errors to stable error codes.
 - Do not return provider exception text to the client.
